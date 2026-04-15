@@ -16,41 +16,6 @@ function App() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  useEffect(() => {
-    // Get user's current location
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition((position) => {
-        const { latitude, longitude } = position.coords;
-        setUserLocation({ lat: latitude, lng: longitude });
-        setMapCenter([latitude, longitude]);
-      });
-    }
-
-    // Initial fetch
-    fetchItems();
-
-    // Real-time updates
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'missing_items' },
-        (payload) => {
-          setItems((prev) => [payload.new as MissingItem, ...prev]);
-          if (notificationsEnabled) {
-            new Notification('New report in MK Found!', {
-              body: (payload.new as MissingItem).name,
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [notificationsEnabled]);
-
   const fetchItems = async () => {
     // For demo purposes, if Supabase isn't set up, we'll use mock data
     const { data, error } = await supabase
@@ -93,6 +58,44 @@ function App() {
       setItems(data);
     }
   };
+
+  useEffect(() => {
+    // Get user's current location
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation({ lat: latitude, lng: longitude });
+        setMapCenter([latitude, longitude]);
+      });
+    }
+
+    // Initial fetch
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchItems();
+  }, []);
+
+  useEffect(() => {
+    // Real-time updates
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'missing_items' },
+        (payload) => {
+          setItems((prev) => [payload.new as MissingItem, ...prev]);
+          if (notificationsEnabled) {
+            new Notification('New report in MK Found!', {
+              body: (payload.new as MissingItem).name,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [notificationsEnabled]);
 
   const filteredItems = useMemo(() => {
     return items
